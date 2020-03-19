@@ -10,6 +10,8 @@
     UIImage* sourceImage;
 }
 
+#define RGBACOLOR(c) [UIColor colorWithRed:((c>>16)&0xFF)/255.0 green:((c>>8)&0xFF)/255.0 blue:((c)&0xFF)/255.0  alpha:((c>>24)&0xFF)/255.0]
+
 - (void) resize:(CDVInvokedUrlCommand*)command
 {
     __block PHImageRequestOptions * imageRequestOptions = [[PHImageRequestOptions alloc] init];
@@ -27,6 +29,8 @@
     CGSize frameSize = CGSizeMake([[arguments objectForKey:@"width"] floatValue], [[arguments objectForKey:@"height"] floatValue]);
     NSString* fileName = [arguments objectForKey:@"fileName"];
     
+    BOOL fit = [[arguments objectForKey:@"fit"] boolValue];
+    NSInteger background = [[arguments objectForKey:@"background"] intValue];
     BOOL asBase64 = [[arguments objectForKey:@"base64"] boolValue];
     BOOL fixRotation = [[arguments objectForKey:@"fixRotation"] boolValue];
     
@@ -100,13 +104,17 @@
     
     thumbnailRect.size.width  = newWidth;
     thumbnailRect.size.height = newHeight;
-    targetSize.width = newWidth;
-    targetSize.height = newHeight;
+    if(fit) {
+        tempImage = [self image:sourceImage scaleImageToSize:targetSize backgroundColor:RGBACOLOR(background)];
+    } else {
+        targetSize.width = newWidth;
+        targetSize.height = newHeight;
+        
+        UIGraphicsBeginImageContext(targetSize);
+        [sourceImage drawInRect:thumbnailRect];
+        tempImage = UIGraphicsGetImageFromCurrentImageContext();
+    }
     
-    UIGraphicsBeginImageContext(targetSize);
-    [sourceImage drawInRect:thumbnailRect];
-    
-    tempImage = UIGraphicsGetImageFromCurrentImageContext();
     NSLog(@"image resizer:%@",  (tempImage  ? @"image exsist" : @"null" ));
     
     if(fixRotation){
@@ -141,6 +149,28 @@
     }
     
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+}
+
+- (UIImage *)image:(UIImage *)image scaleImageToSize:(CGSize)newSize backgroundColor:(UIColor*) color {
+    CGRect scaledImageRect = CGRectZero;
+    
+    CGFloat aspectWidth = newSize.width / image.size.width;
+    CGFloat aspectHeight = newSize.height / image.size.height;
+    CGFloat aspectRatio = MIN ( aspectWidth, aspectHeight );
+    
+    scaledImageRect.size.width = image.size.width * aspectRatio;
+    scaledImageRect.size.height = image.size.height * aspectRatio;
+    scaledImageRect.origin.x = (newSize.width - scaledImageRect.size.width) / 2.0f;
+    scaledImageRect.origin.y = (newSize.height - scaledImageRect.size.height) / 2.0f;
+    
+    UIGraphicsBeginImageContextWithOptions( newSize, NO, 0 );
+    [color set]; //set the desired background color
+    UIRectFill(CGRectMake(0.0, 0.0, newSize.width, newSize.height)); //fill the bitmap context
+    [image drawInRect:scaledImageRect];
+    UIImage* scaledImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    
+    return scaledImage;
 }
 
 - (UIImage*) rotateImage:(UIImage*) image withRotation:(int) rotation{
