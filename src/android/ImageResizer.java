@@ -2,8 +2,9 @@ package info.protonet.imageresizer;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
 import android.net.Uri;
@@ -35,6 +36,7 @@ public class ImageResizer extends CordovaPlugin {
     private int width;
     private int height;
 
+    private int background = Color.TRANSPARENT;
     private boolean base64 = false;
     private boolean fit = false;
     private boolean fixRotation = false;
@@ -67,6 +69,8 @@ public class ImageResizer extends CordovaPlugin {
                 width = jsonObject.getInt("width");
                 height = jsonObject.getInt("height");
 
+                background = jsonObject.optInt("background", Color.TRANSPARENT);
+                base64 = jsonObject.optBoolean("base64", false);
                 base64 = jsonObject.optBoolean("base64", false);
                 fit = jsonObject.optBoolean("fit", false);
                 fixRotation = jsonObject.optBoolean("fixRotation",false);
@@ -74,7 +78,7 @@ public class ImageResizer extends CordovaPlugin {
                 Bitmap bitmap;
                 // load the image from uri
                 if (isFileUri) {
-                    bitmap = loadScaledBitmapFromUri(uri, width, height);
+                    bitmap = loadScaledBitmapFromUri(uri, width, height, fit);
 
                 } else {
                     bitmap = this.loadBase64ScaledBitmapFromUri(uri, width, height, fit);
@@ -209,19 +213,36 @@ public class ImageResizer extends CordovaPlugin {
      *
      * @params uri the URI who points to the image
      **/
-    private Bitmap loadScaledBitmapFromUri(String uriString, int width, int height) {
+    private Bitmap loadScaledBitmapFromUri(String uriString, int width, int height, boolean fit) {
         try {
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inJustDecodeBounds = true;
-            BitmapFactory.decodeStream(FileHelper.getInputStreamFromUriString(uriString, cordova), null, options);
+			BitmapFactory.Options options = new BitmapFactory.Options();
+			options.inJustDecodeBounds = true;
+			BitmapFactory.decodeStream(FileHelper.getInputStreamFromUriString(uriString, cordova), null, options);
 
-            //calc aspect ratio
-            int[] retval = calculateAspectRatio(options.outWidth, options.outHeight);
+			//calc aspect ratio
+			int[] retval = calculateAspectRatio(options.outWidth, options.outHeight);
 
-            options.inJustDecodeBounds = false;
-            options.inSampleSize = calculateSampleSize(options.outWidth, options.outHeight, width, height);
-            Bitmap unscaledBitmap = BitmapFactory.decodeStream(FileHelper.getInputStreamFromUriString(uriString, cordova), null, options);
-            return Bitmap.createScaledBitmap(unscaledBitmap, retval[0], retval[1], true);
+			options.inJustDecodeBounds = false;
+			options.inSampleSize = calculateSampleSize(options.outWidth, options.outHeight, width, height);
+			Bitmap unscaledBitmap = BitmapFactory.decodeStream(FileHelper.getInputStreamFromUriString(uriString, cordova), null, options);
+			if(fit) {
+
+				Bitmap dstBitmap = Bitmap.createBitmap(
+					width, // Width
+					height, // Height
+					Bitmap.Config.ARGB_8888 // Config
+				);
+
+				Canvas canvas = new Canvas(dstBitmap);
+				canvas.drawColor(background);
+
+
+				canvas.drawBitmap(unscaledBitmap,(width - retval[0]) / 2 , (height - retval[1]) / 2, null);
+				return dstBitmap;
+
+			} else {
+				return Bitmap.createScaledBitmap(unscaledBitmap, retval[0], retval[1], true);
+			}
         } catch (FileNotFoundException e) {
             Log.e("Protonet", "File not found. :(");
         } catch (IOException e) {

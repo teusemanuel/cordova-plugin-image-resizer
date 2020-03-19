@@ -34,6 +34,7 @@ At the moment the plugin is available on android, iOS and windows
   - **height**(Number): The height of the new image
   - **base64**(Boolean): Whether or not to return a base64 encoded image string instead of the path to the resized image
   - **fit**(Boolean): Whether or not to fit image in bounds defined by width and height **android only**
+  - **background**(Int): background of the image file when fit not cover all the image **android only**
 
 ### Android Example
 ```
