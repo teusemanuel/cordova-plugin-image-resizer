@@ -26,6 +26,7 @@
     NSLog(@"Image Resizer Image URL : %@",imageUrlString);
     
     NSString* quality = [arguments objectForKey:@"quality"];
+    CGSize frameCrop = CGSizeMake([[arguments objectForKey:@"cropWidth"] floatValue], [[arguments objectForKey:@"cropHeight"] floatValue]);
     CGSize frameSize = CGSizeMake([[arguments objectForKey:@"width"] floatValue], [[arguments objectForKey:@"height"] floatValue]);
     NSString* fileName = [arguments objectForKey:@"fileName"];
     
@@ -104,8 +105,26 @@
     
     thumbnailRect.size.width  = newWidth;
     thumbnailRect.size.height = newHeight;
+    CGSize imageSize = CGSizeMake(sourceImage.size.width, sourceImage.size.height);
+    if(frameCrop.height > 0 && frameCrop.width > 0) {
+        CGFloat topSafeArea;
+        CGFloat bottomSafeArea;
+        UIWindow *window = UIApplication.sharedApplication.keyWindow;
+        if (@available(iOS 11.0, *)) {
+            topSafeArea = window.safeAreaInsets.top * [UIScreen mainScreen].scale;
+            bottomSafeArea = window.safeAreaInsets.bottom * [UIScreen mainScreen].scale;
+        } else {
+            topSafeArea = 0;
+            bottomSafeArea = 0;
+        }
+        
+        CGRect cropRect = CGRectMake((widthInPixels - frameCrop.width ) / 2, ((heightInPixels + (frameCrop.height > frameCrop.width ? topSafeArea - bottomSafeArea : 0)) - frameCrop.height) / 2, frameCrop.width, frameCrop.height);
+        CGImageRef imageRef = CGImageCreateWithImageInRect([sourceImage CGImage], cropRect);
+        sourceImage = [UIImage imageWithCGImage:imageRef];
+        CGImageRelease(imageRef);
+    }
     if(fit) {
-        tempImage = [self image:sourceImage scaleImageToSize:targetSize backgroundColor:RGBACOLOR(background)];
+        tempImage = [self image:sourceImage imageSize: imageSize scaleImageToSize:targetSize backgroundColor:RGBACOLOR(background)];
     } else {
         targetSize.width = newWidth;
         targetSize.height = newHeight;
@@ -151,7 +170,7 @@
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
 }
 
-- (UIImage *)image:(UIImage *)image scaleImageToSize:(CGSize)newSize backgroundColor:(UIColor*) color {
+- (UIImage *)image:(UIImage *)image imageSize:(CGSize) imageSize scaleImageToSize:(CGSize)newSize backgroundColor:(UIColor*) color {
     CGRect scaledImageRect = CGRectZero;
     
     CGFloat aspectWidth = newSize.width / image.size.width;

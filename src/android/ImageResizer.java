@@ -35,6 +35,8 @@ public class ImageResizer extends CordovaPlugin {
     private int quality;
     private int width;
     private int height;
+    private int cropWidth;
+    private int cropHeight;
 
     private int background = Color.TRANSPARENT;
     private boolean base64 = false;
@@ -68,6 +70,8 @@ public class ImageResizer extends CordovaPlugin {
                 quality = jsonObject.optInt("quality", 85);
                 width = jsonObject.getInt("width");
                 height = jsonObject.getInt("height");
+				cropWidth = jsonObject.getInt("cropWidth");
+				cropHeight = jsonObject.getInt("cropHeight");
 
                 background = jsonObject.optInt("background", Color.TRANSPARENT);
                 base64 = jsonObject.optBoolean("base64", false);
@@ -220,11 +224,15 @@ public class ImageResizer extends CordovaPlugin {
 			BitmapFactory.decodeStream(FileHelper.getInputStreamFromUriString(uriString, cordova), null, options);
 
 			//calc aspect ratio
-			int[] retval = calculateAspectRatio(options.outWidth, options.outHeight);
+			int[] retval = calculateAspectRatio(options.outWidth, options.outHeight, width, height);
 
 			options.inJustDecodeBounds = false;
 			options.inSampleSize = calculateSampleSize(options.outWidth, options.outHeight, width, height);
 			Bitmap unscaledBitmap = BitmapFactory.decodeStream(FileHelper.getInputStreamFromUriString(uriString, cordova), null, options);
+			if(cropWidth > 0 && cropHeight > 0) {
+				unscaledBitmap = Bitmap.createBitmap(unscaledBitmap, (options.outWidth - cropWidth ) / 2 , (options.outHeight - cropHeight) / 2, cropWidth, cropHeight);
+			}
+
 			if(fit) {
 
 				Bitmap dstBitmap = Bitmap.createBitmap(
@@ -237,7 +245,7 @@ public class ImageResizer extends CordovaPlugin {
 				canvas.drawColor(background);
 
 
-				canvas.drawBitmap(unscaledBitmap,(width - retval[0]) / 2 , (height - retval[1]) / 2, null);
+				canvas.drawBitmap(unscaledBitmap,(width - (cropWidth > 0 ? cropWidth : retval[0])) / 2 , (height - (cropHeight > 0 ? cropHeight : retval[1])) / 2, null);
 				return dstBitmap;
 
 			} else {
@@ -317,9 +325,7 @@ public class ImageResizer extends CordovaPlugin {
      * @param origHeight
      * @return
      */
-    private int[] calculateAspectRatio(int origWidth, int origHeight) {
-        int newWidth = width;
-        int newHeight = height;
+    private int[] calculateAspectRatio(int origWidth, int origHeight, int newWidth, int newHeight) {
 
         // If no new width or height were specified return the original bitmap
         if (newWidth <= 0 && newHeight <= 0) {
